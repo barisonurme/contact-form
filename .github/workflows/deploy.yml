@@ -42,6 +42,7 @@ jobs:
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_KEY }}
           script: |
+            set -e
             cd /opt/expanse
             echo "${{ secrets.GHCR_PAT }}" | docker login ghcr.io -u barisonurme --password-stdin
             docker compose pull contact
