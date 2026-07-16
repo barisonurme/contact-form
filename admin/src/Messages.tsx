@@ -40,6 +40,7 @@ export default function Messages({ stats, onStatsChange, onLogout }: Props) {
   const [unreadOnly, setUnreadOnly] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
 
   const totalUnread = stats.reduce((sum, s) => sum + s.unread, 0);
 
@@ -73,6 +74,16 @@ export default function Messages({ stats, onStatsChange, onLogout }: Props) {
     onStatsChange();
   }
 
+  async function refresh() {
+    setRefreshing(true);
+    try {
+      await load();
+      onStatsChange();
+    } finally {
+      setRefreshing(false);
+    }
+  }
+
   async function logout() {
     await api('/api/admin/logout', { method: 'POST' });
     onLogout();
@@ -89,12 +100,22 @@ export default function Messages({ stats, onStatsChange, onLogout }: Props) {
             {totalUnread > 0 ? `${totalUnread} okunmamış mesaj` : 'Tüm mesajlar okundu'}
           </p>
         </div>
-        <button
-          onClick={() => void logout()}
-          className="rounded-lg border border-zinc-700 px-3 py-1.5 text-sm text-zinc-400 hover:bg-zinc-900"
-        >
-          Çıkış
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => void refresh()}
+            disabled={refreshing}
+            className="flex items-center gap-1.5 rounded-lg border border-zinc-700 px-3 py-1.5 text-sm text-zinc-400 hover:bg-zinc-900 disabled:opacity-40"
+          >
+            <span className={refreshing ? 'inline-block animate-spin' : undefined}>↻</span>
+            Yenile
+          </button>
+          <button
+            onClick={() => void logout()}
+            className="rounded-lg border border-zinc-700 px-3 py-1.5 text-sm text-zinc-400 hover:bg-zinc-900"
+          >
+            Çıkış
+          </button>
+        </div>
       </header>
 
       <div className="mb-4 flex flex-wrap items-center gap-3">
