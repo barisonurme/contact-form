@@ -35,6 +35,17 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+      - name: Copy compose file to VPS
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          source: deploy/docker-compose.yml
+          target: /opt/contact
+          strip_components: 1
+          overwrite: true
+
       - name: Deploy to VPS
         uses: appleboy/ssh-action@v1
         with:
@@ -43,7 +54,7 @@ jobs:
           key: ${{ secrets.SSH_KEY }}
           script: |
             set -e
-            cd /opt/expanse
+            cd /opt/contact
             echo "${{ secrets.GHCR_PAT }}" | docker login ghcr.io -u barisonurme --password-stdin
             docker compose pull contact
             docker compose run --rm contact bun run db:migrate

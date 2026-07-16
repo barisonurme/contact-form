@@ -116,9 +116,10 @@ docker run --env-file .env -p 3000:3000 contact
 ```
 
 `main`'e push'ta [deploy.yml](.github/workflows/deploy.yml) multi-arch
-(amd64/arm64) imajı `ghcr.io/barisonurme/contact`'a basar, ardından SSH ile
-sunucudaki `/opt/expanse` stack'inde `contact` servisini günceller
-(pull → migrate → up). Compose tanımı bu repoda değil, sunucuda yaşar.
+(amd64/arm64) imajı `ghcr.io/barisonurme/contact`'a basar,
+[deploy/docker-compose.yml](deploy/docker-compose.yml)'ı sunucudaki
+`/opt/contact`'a kopyalar ve servisi günceller (pull → migrate → up).
+Sunucu mimarisi ve tek seferlik kurulum: [deploy/SERVER.md](deploy/SERVER.md).
 
 Gerekli GitHub secrets: `SSH_HOST`, `SSH_USER`, `SSH_KEY`, `GHCR_PAT`
 (packages:read yetkili PAT; imaj push'u `GITHUB_TOKEN` ile yapılır).

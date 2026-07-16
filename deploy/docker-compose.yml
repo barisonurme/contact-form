@@ -1,0 +1,35 @@
+# /opt/contact/docker-compose.yml — deploy pipeline'ı her push'ta bu dosyayı sunucuya kopyalar.
+# Sunucudaki hali elle DÜZENLEME; değişiklik buradan yapılır.
+services:
+  contact:
+    image: ghcr.io/barisonurme/contact:latest
+    restart: unless-stopped
+    env_file: ./contact.env
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - default
+      - proxy
+
+  db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: contact
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?/opt/contact/.env icinde POSTGRES_PASSWORD tanimla}
+      POSTGRES_DB: contact
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U contact -d contact']
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+volumes:
+  db-data:
+
+networks:
+  proxy:
+    external: true
