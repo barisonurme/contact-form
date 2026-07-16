@@ -14,8 +14,8 @@ network'ü üzerinden konuşur. 80/443'ün tek sahibi `/opt/proxy`'deki Caddy'di
 - `docker-compose.yml` — bu repodaki `deploy/docker-compose.yml`'ın kopyası;
   her push'ta CI tarafından üzerine yazılır, sunucuda elle düzenleme.
 - `contact.env` — uygulama env'i (repoda yok, sunucuda elle durur).
-  DİKKAT: `ADMIN_PASSWORD_HASH` içindeki her `$`, `$$` olarak yazılır
-  (docker compose env_file interpolation'ı).
+  Compose bu dosyayı `format: raw` ile okur: değerler olduğu gibi geçer,
+  `ADMIN_PASSWORD_HASH` tek `$` ile kaçışsız yazılır.
 - `.env` — sadece `POSTGRES_PASSWORD=...` (compose interpolation için;
   `contact.env` içindeki `DATABASE_URL`'in şifresiyle aynı olmalı).
 
