@@ -25,7 +25,12 @@ const envSchema = z.object({
 
   ADMIN_PASSWORD_HASH: z
     .string()
-    .startsWith('$2', 'ADMIN_PASSWORD_HASH must be a bcrypt hash (starts with $2)'),
+    .regex(
+      /^\$2[aby]\$\d{2}\$[./A-Za-z0-9]{53}$/,
+      'ADMIN_PASSWORD_HASH must be a complete bcrypt hash ($2b$12$ + 53 chars). ' +
+        'If it looks truncated, docker compose likely ate parts of it — in the env file, ' +
+        'escape every $ as $$',
+    ),
   JWT_SECRET: z.string().min(32, 'JWT_SECRET must be at least 32 characters'),
 });
 
