@@ -44,6 +44,9 @@ backend `./admin/dist`'i `/admin` altında kendisi sunar.
 | `MAIL_FROM` / `MAIL_TO` | Bildirim mailinin gönderen/alıcısı |
 | `ALLOWED_SITES` | Kabul edilen `site` değerleri, virgülle ayrılmış |
 | `ALLOWED_ORIGINS` | `/api/submit` için CORS origin'leri, virgülle ayrılmış |
+| `PAGEVIEW_ALLOWED_ORIGINS` | Pageview gönderebilecek host'lar (şemasız), virgülle ayrılmış. Default: `barisonurme.com,www.barisonurme.com,localhost,127.0.0.1` |
+| `PAGEVIEW_ALLOWED_SITES` | Pageview için kabul edilen site id'leri. Boşsa `ALLOWED_SITES` |
+| `SERVER_SECRET` | Günlük ziyaretçi-hash salt'ının kaynağı, min 16 karakter (`openssl rand -hex 32`) |
 | `ADMIN_PASSWORD_HASH` | Admin şifresinin bcrypt hash'i (aşağıya bak) |
 | `JWT_SECRET` | Session JWT imzası, min 32 karakter (`openssl rand -hex 32`) |
 
@@ -59,6 +62,7 @@ bun run hash 'cok-gizli-sifre'
 | Endpoint | Açıklama |
 | --- | --- |
 | `POST /api/submit` | Form gönderimi (public, CORS + IP başına dakikada 3) |
+| `POST /api/pageview` | Pageview kaydı (public, origin allowlist + IP başına dakikada 60). Başarıda ve doğrulama hatasında **her zaman 204**, gövde yok; rate limit'te 429. `navigator.sendBeacon` için `text/plain` gövde de kabul edilir. |
 | `GET /api/health` | `{ "status": "ok" }` |
 | `POST /api/admin/login` | `{ password }` → HttpOnly session cookie (dakikada 5 deneme) |
 | `POST /api/admin/logout` | Session'ı sonlandırır |
@@ -66,6 +70,7 @@ bun run hash 'cok-gizli-sifre'
 | `PATCH /api/admin/messages/:id/read` | Okundu işaretle |
 | `DELETE /api/admin/messages/:id` | Sil |
 | `GET /api/admin/stats` | Site başına toplam/okunmamış |
+| `GET /api/pageview/stats?site=&from=&to=&groupBy=` | Pageview özeti (admin session gerekir). `groupBy`: `path\|country\|referrer\|day`. Döner: `totalViews`, `uniqueVisitors`, `breakdown`. |
 
 ## Yeni bir siteye form ekleme
 
@@ -95,6 +100,49 @@ bun run hash 'cok-gizli-sifre'
     });
     alert(res.ok ? 'Mesajınız gönderildi, teşekkürler!' : 'Bir hata oluştu, tekrar deneyin.');
   });
+</script>
+```
+
+## Pageview analytics
+
+`POST /api/pageview` — public, kimlik doğrulamasız yazma endpoint'i. Sitenin her
+sayfa yüklemesinde çağrılır. İstemciden gelen gövde: `{ site, path, referrer?, screen? }`.
+`timestamp`, `country`/`region` (edge header'ları), user agent **sunucu tarafında**
+türetilir, istemciye güvenilmez.
+
+Kötüye kullanıma karşı: origin allowlist (`PAGEVIEW_ALLOWED_ORIGINS`, POST-only),
+~1 KB gövde limiti, katı şema (bilinmeyen alan reddedilir), IP başına dakikada 60,
+bot filtresi (`bot|crawl|spider|slurp|headless|preview`), aynı ziyaretçi+path için
+10 sn dedupe. Doğrulama hatasında bile **her zaman 204** döner — abuser'a geri bildirim yok.
+
+Gizlilik (kayıtta PII yok): ham IP saklanmaz. Unique ziyaretçi sayımı için
+`visitorHash = sha256(dailySalt + ip + ua)`, `dailySalt = sha256(SERVER_SECRET + UTC-tarih)`
+— salt her gün döner, hash'ler günler arası ilişkilendirilemez. Saklanan: `site, path,
+referrer, country, region, uaFamily, deviceType, visitorHash, ts`. Kendi tablosu
+(`pageviews`), contact mesajlarından ayrı.
+
+Saklama: ham satırlar 90 gün tutulur, sonra günlük servis içi bir job bunları
+`pageview_daily` tablosuna (gün/site/path/country başına view + unique sayıları)
+toplayıp ham satırları siler.
+
+`GET /api/pageview/stats` admin session ister (contact admin paneli ile aynı).
+Sorgu: `site` (zorunlu), `from`/`to` (`YYYY-MM-DD`, default son 30 gün),
+`groupBy` (`path|country|referrer|day`). Ham + toplanmış veriyi birleştirir.
+
+Yeni siteye pageview eklemek: site id'sini `PAGEVIEW_ALLOWED_SITES`'a (ya da
+`ALLOWED_SITES`'a), host'unu `PAGEVIEW_ALLOWED_ORIGINS`'a ekle.
+
+```html
+<script>
+  navigator.sendBeacon(
+    'https://contact.barisonurme.com/api/pageview',
+    JSON.stringify({
+      site: 'portfolio',
+      path: location.pathname,
+      referrer: document.referrer,
+      screen: `${screen.width}x${screen.height}`,
+    }),
+  );
 </script>
 ```
 

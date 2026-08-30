@@ -8,6 +8,13 @@
       "when": 1783582677415,
       "tag": "0000_regular_mockingbird",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1788088992658,
+      "tag": "0001_cheerful_trauma",
+      "breakpoints": true
     }
   ]
 }

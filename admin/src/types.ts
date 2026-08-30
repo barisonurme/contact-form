@@ -21,3 +21,21 @@ export interface SiteStats {
   total: number;
   unread: number;
 }
+
+export type PageviewGroupBy = 'path' | 'country' | 'referrer' | 'day';
+
+export interface PageviewGroupRow {
+  key: string;
+  views: number;
+  uniques: number;
+}
+
+export interface PageviewStats {
+  site: string;
+  from: string;
+  to: string;
+  totalViews: number;
+  uniqueVisitors: number;
+  groupBy: PageviewGroupBy | null;
+  breakdown: PageviewGroupRow[] | null;
+}

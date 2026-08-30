@@ -16,6 +16,9 @@ network'ü üzerinden konuşur. 80/443'ün tek sahibi `/opt/proxy`'deki Caddy'di
 - `contact.env` — uygulama env'i (repoda yok, sunucuda elle durur).
   Compose bu dosyayı `format: raw` ile okur: değerler olduğu gibi geçer,
   `ADMIN_PASSWORD_HASH` tek `$` ile kaçışsız yazılır.
+  Pageview analytics için `SERVER_SECRET` (min 16 char, `openssl rand -hex 32`)
+  eklenmeli — yoksa servis başlamaz. `PAGEVIEW_ALLOWED_ORIGINS` /
+  `PAGEVIEW_ALLOWED_SITES` opsiyonel (bkz. `.env.example`).
 - `.env` — sadece `POSTGRES_PASSWORD=...` (compose interpolation için;
   `contact.env` içindeki `DATABASE_URL`'in şifresiyle aynı olmalı).
 

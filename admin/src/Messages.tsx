@@ -30,10 +30,9 @@ function formatDate(iso: string): string {
 interface Props {
   stats: SiteStats[];
   onStatsChange: () => void;
-  onLogout: () => void;
 }
 
-export default function Messages({ stats, onStatsChange, onLogout }: Props) {
+export default function Messages({ stats, onStatsChange }: Props) {
   const [data, setData] = useState<MessagesResponse | null>(null);
   const [page, setPage] = useState(1);
   const [site, setSite] = useState('');
@@ -84,39 +83,26 @@ export default function Messages({ stats, onStatsChange, onLogout }: Props) {
     }
   }
 
-  async function logout() {
-    await api('/api/admin/logout', { method: 'POST' });
-    onLogout();
-  }
-
   const totalPages = data ? Math.max(1, Math.ceil(data.total / data.pageSize)) : 1;
 
   return (
-    <div className="mx-auto max-w-4xl p-4 sm:p-6">
-      <header className="mb-6 flex flex-wrap items-center justify-between gap-3">
+    <div>
+      <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-xl font-semibold">Mesajlar</h1>
-          <p className="text-sm text-zinc-500">
+          <h1 className="text-xl font-semibold tracking-tight">Mesajlar</h1>
+          <p className="mt-0.5 text-sm text-zinc-500">
             {totalUnread > 0 ? `${totalUnread} okunmamış mesaj` : 'Tüm mesajlar okundu'}
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => void refresh()}
-            disabled={refreshing}
-            className="flex items-center gap-1.5 rounded-lg border border-zinc-700 px-3 py-1.5 text-sm text-zinc-400 hover:bg-zinc-900 disabled:opacity-40"
-          >
-            <span className={refreshing ? 'inline-block animate-spin' : undefined}>↻</span>
-            Yenile
-          </button>
-          <button
-            onClick={() => void logout()}
-            className="rounded-lg border border-zinc-700 px-3 py-1.5 text-sm text-zinc-400 hover:bg-zinc-900"
-          >
-            Çıkış
-          </button>
-        </div>
-      </header>
+        <button
+          onClick={() => void refresh()}
+          disabled={refreshing}
+          className="flex items-center gap-1.5 rounded-lg border border-zinc-800 px-3 py-1.5 text-sm text-zinc-400 transition hover:border-zinc-700 hover:text-zinc-200 disabled:opacity-40"
+        >
+          <span className={refreshing ? 'inline-block animate-spin' : undefined}>↻</span>
+          Yenile
+        </button>
+      </div>
 
       <div className="mb-4 flex flex-wrap items-center gap-3">
         <select
@@ -125,7 +111,7 @@ export default function Messages({ stats, onStatsChange, onLogout }: Props) {
             setSite(e.target.value);
             setPage(1);
           }}
-          className="rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-1.5 text-sm"
+          className="rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-1.5 text-sm outline-none transition focus:border-sky-500"
         >
           <option value="">Tüm siteler</option>
           {stats.map((s) => (
@@ -148,9 +134,13 @@ export default function Messages({ stats, onStatsChange, onLogout }: Props) {
         </label>
       </div>
 
-      {error && <p className="mb-4 text-sm text-rose-400">{error}</p>}
+      {error && (
+        <p className="mb-4 rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-sm text-rose-300">
+          {error}
+        </p>
+      )}
 
-      <ul className="divide-y divide-zinc-800 rounded-xl border border-zinc-800 bg-zinc-900">
+      <ul className="divide-y divide-zinc-800 overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900">
         {data?.items.length === 0 && (
           <li className="p-8 text-center text-sm text-zinc-500">Mesaj yok</li>
         )}
@@ -160,9 +150,11 @@ export default function Messages({ stats, onStatsChange, onLogout }: Props) {
             <li key={msg.id}>
               <button
                 onClick={() => setExpandedId(expanded ? null : msg.id)}
-                className="flex w-full flex-wrap items-center gap-x-3 gap-y-1 p-3 text-left hover:bg-zinc-800/50 sm:flex-nowrap"
+                className="flex w-full flex-wrap items-center gap-x-3 gap-y-1 p-3 text-left transition hover:bg-zinc-800/50 sm:flex-nowrap"
               >
-                {!msg.read && <span className="h-2 w-2 shrink-0 rounded-full bg-sky-400" />}
+                <span
+                  className={`h-2 w-2 shrink-0 rounded-full ${msg.read ? 'bg-transparent' : 'bg-sky-400'}`}
+                />
                 <span
                   className={`shrink-0 rounded-md px-2 py-0.5 text-xs font-medium ring-1 ${siteBadgeClass(msg.site)}`}
                 >
@@ -190,14 +182,14 @@ export default function Messages({ stats, onStatsChange, onLogout }: Props) {
                     {!msg.read && (
                       <button
                         onClick={() => void markRead(msg.id)}
-                        className="rounded-lg bg-sky-600 px-3 py-1.5 text-sm font-medium hover:bg-sky-500"
+                        className="rounded-lg bg-sky-600 px-3 py-1.5 text-sm font-medium transition hover:bg-sky-500"
                       >
                         Okundu işaretle
                       </button>
                     )}
                     <button
                       onClick={() => void remove(msg.id)}
-                      className="rounded-lg border border-rose-500/40 px-3 py-1.5 text-sm text-rose-400 hover:bg-rose-500/10"
+                      className="rounded-lg border border-rose-500/40 px-3 py-1.5 text-sm text-rose-400 transition hover:bg-rose-500/10"
                     >
                       Sil
                     </button>
@@ -214,7 +206,7 @@ export default function Messages({ stats, onStatsChange, onLogout }: Props) {
           <button
             onClick={() => setPage((p) => p - 1)}
             disabled={page <= 1}
-            className="rounded-lg border border-zinc-700 px-3 py-1.5 hover:bg-zinc-900 disabled:opacity-40"
+            className="rounded-lg border border-zinc-800 px-3 py-1.5 transition hover:bg-zinc-900 disabled:opacity-40"
           >
             ← Önceki
           </button>
@@ -224,7 +216,7 @@ export default function Messages({ stats, onStatsChange, onLogout }: Props) {
           <button
             onClick={() => setPage((p) => p + 1)}
             disabled={page >= totalPages}
-            className="rounded-lg border border-zinc-700 px-3 py-1.5 hover:bg-zinc-900 disabled:opacity-40"
+            className="rounded-lg border border-zinc-800 px-3 py-1.5 transition hover:bg-zinc-900 disabled:opacity-40"
           >
             Sonraki →
           </button>

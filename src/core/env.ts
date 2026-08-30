@@ -23,6 +23,18 @@ const envSchema = z.object({
   ALLOWED_SITES: z.string().transform(csv).pipe(z.array(z.string()).min(1)),
   ALLOWED_ORIGINS: z.string().transform(csv).pipe(z.array(z.string()).min(1)),
 
+  // Pageview analytics (POST /api/pageview, GET /api/pageview/stats).
+  // Hosts allowed to send pageviews — host only, no scheme (Origin/Referer host is matched against this).
+  PAGEVIEW_ALLOWED_ORIGINS: z
+    .string()
+    .transform(csv)
+    .pipe(z.array(z.string()).min(1))
+    .default(['barisonurme.com', 'www.barisonurme.com', 'localhost', '127.0.0.1']),
+  // Site ids accepted for pageviews. Falls back to ALLOWED_SITES when unset.
+  PAGEVIEW_ALLOWED_SITES: z.string().transform(csv).pipe(z.array(z.string()).min(1)).optional(),
+  // Secret used to derive the daily visitor-hash salt. Rotate = invalidate all visitor hashes.
+  SERVER_SECRET: z.string().min(16, 'SERVER_SECRET must be at least 16 characters'),
+
   ADMIN_PASSWORD_HASH: z
     .string()
     .regex(
