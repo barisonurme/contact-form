@@ -35,3 +35,40 @@ export async function sendNotification(input: NotificationInput): Promise<void> 
     ].join('\n'),
   });
 }
+
+/** One-time admin login code. Sent to MAIL_TO — the only recipient that matters. */
+export async function sendLoginCode(code: string, ip: string): Promise<void> {
+  await transporter.sendMail({
+    from: env.MAIL_FROM,
+    to: env.MAIL_TO,
+    subject: '[contact] Admin giriş kodu',
+    text: [
+      `Giriş kodu: ${code}`,
+      '10 dakika geçerli, tek kullanımlık.',
+      `İsteği yapan IP: ${ip}`,
+      '',
+      'Bu isteği sen yapmadıysan bu maili yok say.',
+    ].join('\n'),
+  });
+}
+
+export interface SecurityAlertInput {
+  count: number;
+  windowMin: number;
+  lastIp: string;
+}
+
+/** Fired when failed admin logins pile up in a short window. */
+export async function sendSecurityAlert(input: SecurityAlertInput): Promise<void> {
+  await transporter.sendMail({
+    from: env.MAIL_FROM,
+    to: env.MAIL_TO,
+    subject: '[contact] Tekrarlayan başarısız admin girişleri',
+    text: [
+      `Son ${input.windowMin} dakikada ${input.count} başarısız admin giriş denemesi.`,
+      `En son deneyen IP: ${input.lastIp}`,
+      '',
+      'Brute-force ihtimaline karşı göz at.',
+    ].join('\n'),
+  });
+}

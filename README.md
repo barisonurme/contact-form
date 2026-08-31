@@ -47,15 +47,16 @@ backend `./admin/dist`'i `/admin` altında kendisi sunar.
 | `PAGEVIEW_ALLOWED_ORIGINS` | Pageview gönderebilecek host'lar (şemasız), virgülle ayrılmış. Default: `barisonurme.com,www.barisonurme.com,localhost,127.0.0.1` |
 | `PAGEVIEW_ALLOWED_SITES` | Pageview için kabul edilen site id'leri. Boşsa `ALLOWED_SITES` |
 | `SERVER_SECRET` | Günlük ziyaretçi-hash salt'ının kaynağı, min 16 karakter (`openssl rand -hex 32`) |
-| `ADMIN_PASSWORD_HASH` | Admin şifresinin bcrypt hash'i (aşağıya bak) |
 | `JWT_SECRET` | Session JWT imzası, min 32 karakter (`openssl rand -hex 32`) |
+| `TRUSTED_PROXY_HOPS` | Önündeki güvenilir reverse-proxy sayısı (default `1`; Caddy). Client IP `X-Forwarded-For`'un sağdan N. değeri. `0` = proxy yok (lokal) |
 
-### Admin şifre hash'i üretme
+### Admin girişi
 
-```bash
-bun run hash 'cok-gizli-sifre'
-# çıktıyı ADMIN_PASSWORD_HASH olarak .env'e koy
-```
+Şifresiz. Login ekranında "E-posta ile kod gönder" → 6 haneli tek kullanımlık kod
+`MAIL_TO` adresine gelir (10 dk geçerli, en fazla 5 deneme), kodu girince
+HttpOnly session cookie set edilir. IP başına dakikada 5, tüm IP'ler toplamı 10
+dakikada 15 deneme ile sınırlı; başarısız denemeler birikince `MAIL_TO`'ya uyarı
+maili gider.
 
 ## API
 
@@ -64,7 +65,8 @@ bun run hash 'cok-gizli-sifre'
 | `POST /api/submit` | Form gönderimi (public, CORS + IP başına dakikada 3) |
 | `POST /api/pageview` | Pageview kaydı (public, origin allowlist + IP başına dakikada 60). Başarıda ve doğrulama hatasında **her zaman 204**, gövde yok; rate limit'te 429. `navigator.sendBeacon` için `text/plain` gövde de kabul edilir. |
 | `GET /api/health` | `{ "status": "ok" }` |
-| `POST /api/admin/login` | `{ password }` → HttpOnly session cookie (dakikada 5 deneme) |
+| `POST /api/admin/login/request` | 6 haneli kodu `MAIL_TO`'ya e-postalar (IP/dk 5 + global 10dk/15) |
+| `POST /api/admin/login` | `{ code }` → HttpOnly session cookie (aynı limitler) |
 | `POST /api/admin/logout` | Session'ı sonlandırır |
 | `GET /api/admin/messages?page=&site=&unread=true` | Sayfalı liste (20/sayfa) |
 | `PATCH /api/admin/messages/:id/read` | Okundu işaretle |

@@ -35,15 +35,13 @@ const envSchema = z.object({
   // Secret used to derive the daily visitor-hash salt. Rotate = invalidate all visitor hashes.
   SERVER_SECRET: z.string().min(16, 'SERVER_SECRET must be at least 16 characters'),
 
-  ADMIN_PASSWORD_HASH: z
-    .string()
-    .regex(
-      /^\$2[aby]\$\d{2}\$[./A-Za-z0-9]{53}$/,
-      'ADMIN_PASSWORD_HASH must be a complete bcrypt hash ($2b$12$ + 53 chars). ' +
-        'If it looks truncated, docker compose likely ate parts of it — in the env file, ' +
-        'escape every $ as $$',
-    ),
   JWT_SECRET: z.string().min(32, 'JWT_SECRET must be at least 32 characters'),
+
+  // How many trusted reverse-proxy hops sit in front of the app. The client IP
+  // is read as the Nth-from-rightmost X-Forwarded-For entry (a proxy appends the
+  // address it saw). 0 = no proxy, trust the socket address (local dev).
+  // 1 = our Caddy setup. Anything to the left of that hop is client-spoofable.
+  TRUSTED_PROXY_HOPS: z.coerce.number().int().min(0).max(4).default(1),
 });
 
 const parsed = envSchema.safeParse(process.env);

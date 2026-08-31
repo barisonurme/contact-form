@@ -5,7 +5,7 @@ services:
     image: ghcr.io/barisonurme/contact:latest
     restart: unless-stopped
     # format: raw -> compose $ isaretlerini degisken sanip yorumlamaz;
-    # bcrypt hash'i tek $ ile, kacissiz yazilabilir
+    # env degerleri kacissiz, oldugu gibi gecer
     env_file:
       - path: ./contact.env
         format: raw

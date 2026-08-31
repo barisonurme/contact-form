@@ -7,10 +7,6 @@ import { env } from '../core/env';
 const COOKIE_NAME = 'admin_session';
 const SESSION_TTL_SECONDS = 7 * 24 * 60 * 60; // 7 days
 
-export async function verifyPassword(password: string): Promise<boolean> {
-  return Bun.password.verify(password, env.ADMIN_PASSWORD_HASH);
-}
-
 export async function createSession(c: Context): Promise<void> {
   const now = Math.floor(Date.now() / 1000);
   const token = await sign({ sub: 'admin', iat: now, exp: now + SESSION_TTL_SECONDS }, env.JWT_SECRET);

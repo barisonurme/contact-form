@@ -1,33 +1,57 @@
 import { Hono } from 'hono';
 import { and, count, desc, eq, sql } from 'drizzle-orm';
 import { z } from 'zod';
+import { env } from '../core/env';
 import { logger } from '../core/logger';
 import { db } from '../db';
 import { messages } from '../db/schema';
-import { createSession, destroySession, requireAdmin, verifyPassword } from '../services/auth';
+import { createSession, destroySession, requireAdmin } from '../services/auth';
+import { issueCode, noteFailure, verifyCode } from '../services/login-code';
+import { sendLoginCode } from '../services/mailer';
 import { RateLimiter, clientIp } from '../services/rate-limit';
 
 const PAGE_SIZE = 20;
 
-const loginSchema = z.object({ password: z.string().min(1) });
+const loginSchema = z.object({ code: z.string().regex(/^\d{6}$/) });
+// Per-IP, plus a ceiling across all IPs so a distributed attack still can't
+// grind the 6-digit space or mail-bomb the inbox.
 const loginLimiter = new RateLimiter(5, 60 * 1000);
+const globalLoginLimiter = new RateLimiter(15, 10 * 60 * 1000);
+
+const loginThrottled = (ip: string) =>
+  !loginLimiter.allow(ip) || !globalLoginLimiter.allow('global');
 
 export const adminRoutes = new Hono();
 
+adminRoutes.post('/login/request', async (c) => {
+  const ip = clientIp(c);
+  if (loginThrottled(ip)) {
+    return c.json({ error: 'Çok fazla deneme, biraz sonra tekrar dene' }, 429);
+  }
+
+  const code = issueCode();
+  sendLoginCode(code, ip).catch((err) => logger.error(err, 'login code mail failed'));
+  logger.info({ ip }, 'admin login code requested');
+  if (env.NODE_ENV !== 'production') logger.info({ code }, 'dev login code');
+
+  return c.json({ ok: true });
+});
+
 adminRoutes.post('/login', async (c) => {
   const ip = clientIp(c);
-  if (!loginLimiter.allow(ip)) {
-    return c.json({ error: 'Too many login attempts' }, 429);
+  if (loginThrottled(ip)) {
+    return c.json({ error: 'Çok fazla deneme, biraz sonra tekrar dene' }, 429);
   }
 
   const parsed = loginSchema.safeParse(await c.req.json().catch(() => null));
   if (!parsed.success) {
-    return c.json({ error: 'Password is required' }, 400);
+    return c.json({ error: 'Geçerli bir kod gir' }, 400);
   }
 
-  if (!(await verifyPassword(parsed.data.password))) {
+  if (!verifyCode(parsed.data.code)) {
+    noteFailure(ip);
     logger.warn({ ip }, 'failed admin login');
-    return c.json({ error: 'Invalid password' }, 401);
+    return c.json({ error: 'Invalid code' }, 401);
   }
 
   await createSession(c);

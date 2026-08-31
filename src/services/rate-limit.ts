@@ -1,5 +1,6 @@
 import type { Context } from 'hono';
 import { getConnInfo } from 'hono/bun';
+import { env } from '../core/env';
 
 /** Sliding-window in-memory rate limiter. */
 export class RateLimiter {
@@ -33,10 +34,23 @@ export class RateLimiter {
   }
 }
 
-/** Real client IP: X-Forwarded-For (service runs behind Caddy), else socket address. */
+/**
+ * Real client IP. With `TRUSTED_PROXY_HOPS` proxies in front (our Caddy = 1),
+ * the trusted address is the Nth-from-rightmost `X-Forwarded-For` entry — each
+ * proxy appends the address it saw, so everything further left is spoofable by
+ * the client. Falls back to the socket address when there's no proxy or the
+ * header is shorter than expected.
+ */
 export function clientIp(c: Context): string {
-  const xff = c.req.header('x-forwarded-for');
-  if (xff) return xff.split(',')[0].trim();
+  const hops = env.TRUSTED_PROXY_HOPS;
+  if (hops > 0) {
+    const parts = (c.req.header('x-forwarded-for') ?? '')
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
+    const trusted = parts[parts.length - hops];
+    if (trusted) return trusted;
+  }
   try {
     return getConnInfo(c).remote.address ?? 'unknown';
   } catch {
