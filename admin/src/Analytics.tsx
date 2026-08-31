@@ -10,17 +10,28 @@ const RANGES = [
 
 const GROUPS: { id: PageviewGroupBy; label: string }[] = [
   { id: 'path', label: 'Sayfa' },
-  { id: 'country', label: 'Ülke' },
   { id: 'referrer', label: 'Kaynak' },
+  { id: 'country', label: 'Ülke' },
+  { id: 'region', label: 'Bölge' },
+  { id: 'device', label: 'Cihaz' },
+  { id: 'browser', label: 'Tarayıcı' },
   { id: 'day', label: 'Gün' },
 ];
+
+const DEVICE_TR: Record<string, string> = {
+  mobile: 'Mobil',
+  tablet: 'Tablet',
+  desktop: 'Masaüstü',
+};
 
 const ymd = (d: Date) => d.toISOString().slice(0, 10);
 const fmtNum = (n: number) => n.toLocaleString('tr-TR');
 
 function fmtKey(key: string, groupBy: PageviewGroupBy): string {
   if (groupBy === 'referrer') return key === '' ? 'Doğrudan' : key;
-  if (groupBy === 'country') return key === '' ? 'Bilinmiyor' : key;
+  if (groupBy === 'country' || groupBy === 'region') return key === '' ? 'Bilinmiyor' : key;
+  if (groupBy === 'device') return DEVICE_TR[key] ?? key;
+  if (groupBy === 'browser') return key === '' || key === 'Other' ? 'Diğer' : key;
   if (groupBy === 'day') {
     return new Date(`${key}T00:00:00Z`).toLocaleDateString('tr-TR', {
       day: '2-digit',
@@ -171,7 +182,7 @@ export default function Analytics({ stats }: Props) {
       <div className="rounded-xl border border-zinc-800 bg-zinc-900">
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-zinc-800 px-4 py-3">
           <span className="text-sm font-medium text-zinc-300">Dağılım</span>
-          <div className="inline-flex rounded-lg border border-zinc-800 bg-zinc-950 p-0.5">
+          <div className="flex flex-wrap gap-0.5 rounded-lg border border-zinc-800 bg-zinc-950 p-0.5">
             {GROUPS.map((g) => (
               <button key={g.id} onClick={() => setGroupBy(g.id)} className={pill(groupBy === g.id)}>
                 {g.label}

@@ -22,7 +22,14 @@ export interface SiteStats {
   unread: number;
 }
 
-export type PageviewGroupBy = 'path' | 'country' | 'referrer' | 'day';
+export type PageviewGroupBy =
+  | 'path'
+  | 'country'
+  | 'region'
+  | 'referrer'
+  | 'day'
+  | 'browser'
+  | 'device';
 
 export interface PageviewGroupRow {
   key: string;

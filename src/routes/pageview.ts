@@ -32,8 +32,14 @@ const statsQuerySchema = z.object({
   site: z.string().min(1),
   from: z.iso.date().optional(),
   to: z.iso.date().optional(),
-  groupBy: z.enum(['path', 'country', 'referrer', 'day']).optional(),
+  groupBy: z
+    .enum(['path', 'country', 'region', 'referrer', 'day', 'browser', 'device'])
+    .optional(),
 });
+
+// Dimensions the 90-day rollup table (pageview_daily) can answer. Everything
+// else is raw-only and therefore limited to the retention window.
+const ROLLED_UP_DIMS = new Set(['path', 'country', 'day']);
 
 const allowedSites = () => env.PAGEVIEW_ALLOWED_SITES ?? env.ALLOWED_SITES;
 
@@ -266,11 +272,17 @@ pageviewRoutes.get('/stats', requireAdmin, async (c) => {
     const rawKey =
       groupBy === 'country'
         ? sql`coalesce(country, '')`
-        : groupBy === 'day'
-          ? sql`to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD')`
-          : groupBy === 'referrer'
-            ? sql`referrer`
-            : sql`path`;
+        : groupBy === 'region'
+          ? sql`coalesce(region, '')`
+          : groupBy === 'day'
+            ? sql`to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD')`
+            : groupBy === 'referrer'
+              ? sql`referrer`
+              : groupBy === 'browser'
+                ? sql`coalesce(ua_family, 'Other')`
+                : groupBy === 'device'
+                  ? sql`coalesce(device_type, 'desktop')`
+                  : sql`path`;
 
     const rawGroups = (await db.execute(sql`
       SELECT ${rawKey} AS key,
@@ -281,9 +293,10 @@ pageviewRoutes.get('/stats', requireAdmin, async (c) => {
       GROUP BY 1
     `)) as unknown as GroupRow[];
 
-    // The rollup table has no referrer column, so referrer breakdowns are raw-only.
+    // The rollup table only carries day/site/path/country, so any other
+    // breakdown (referrer, browser, device, region) is raw-only.
     let aggGroups: GroupRow[] = [];
-    if (groupBy !== 'referrer') {
+    if (ROLLED_UP_DIMS.has(groupBy)) {
       const aggKey =
         groupBy === 'country'
           ? sql`country`
