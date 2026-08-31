@@ -1,10 +1,11 @@
 import type { ReactNode } from 'react';
 
-export type Tab = 'messages' | 'analytics';
+export type Tab = 'messages' | 'analytics' | 'visitors';
 
 const TABS: { id: Tab; label: string }[] = [
   { id: 'messages', label: 'Mesajlar' },
   { id: 'analytics', label: 'Analitik' },
+  { id: 'visitors', label: 'Ziyaretçiler' },
 ];
 
 interface Props {

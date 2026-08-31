@@ -4,6 +4,7 @@ import Analytics from './Analytics';
 import Layout, { type Tab } from './Layout';
 import Login from './Login';
 import Messages from './Messages';
+import Visitors from './Visitors';
 import type { SiteStats } from './types';
 
 type AuthState = 'checking' | 'in' | 'out';
@@ -51,8 +52,10 @@ export default function App() {
     <Layout tab={tab} onTab={setTab} onLogout={() => void logout()} unread={totalUnread}>
       {tab === 'messages' ? (
         <Messages stats={stats} onStatsChange={() => void refreshStats()} />
-      ) : (
+      ) : tab === 'analytics' ? (
         <Analytics stats={stats} />
+      ) : (
+        <Visitors stats={stats} />
       )}
     </Layout>
   );

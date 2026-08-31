@@ -18,6 +18,11 @@ const statsLimiter = new RateLimiter(30, 60 * 1000);
 const MAX_BODY_BYTES = 1024;
 const DEDUPE_WINDOW_MS = 10 * 1000;
 
+// Raw pageview rows live this long before the retention job rolls them into
+// aggregates (see src/services/pageview-retention.ts). Per-visitor drill-downs
+// can only answer dates inside this window.
+const RAW_RETENTION_DAYS = 90;
+
 // Strict: unknown fields are rejected, types enforced, lengths capped.
 const pageviewSchema = z
   .object({
@@ -35,6 +40,12 @@ const statsQuerySchema = z.object({
   groupBy: z
     .enum(['path', 'country', 'region', 'referrer', 'day', 'browser', 'device'])
     .optional(),
+});
+
+// Per-visitor drill-down: one calendar day (UTC) of raw rows for one site.
+const visitorsQuerySchema = z.object({
+  site: z.string().min(1),
+  day: z.iso.date(),
 });
 
 // Dimensions the 90-day rollup table (pageview_daily) can answer. Everything
@@ -323,4 +334,122 @@ pageviewRoutes.get('/stats', requireAdmin, async (c) => {
     groupBy: groupBy ?? null,
     breakdown,
   });
+});
+
+// --- Per-visitor drill-down ----------------------------------------------
+//
+// A `visitorHash` is sha256(daily-secret + ip + ua) and the secret rotates
+// every UTC day, so a hash identifies a visitor *within one day only* — never
+// across days, and it carries no recoverable IP or User-Agent. These two
+// endpoints expose that single-day view: the list of hashes seen on a day, and
+// the page-by-page path sequence for one hash.
+
+const isVisitorHash = (v: string) => /^[a-f0-9]{64}$/.test(v);
+
+const dayBounds = (day: string) => ({
+  fromTs: `${day}T00:00:00.000Z`,
+  toTs: `${day}T23:59:59.999Z`,
+});
+
+/** True once the retention job may have rolled this day's raw rows into aggregates. */
+const dayIsStale = (day: string) =>
+  Date.now() - Date.parse(`${day}T00:00:00.000Z`) > RAW_RETENTION_DAYS * 24 * 60 * 60 * 1000;
+
+interface VisitorRow {
+  hash: string;
+  views: number;
+  paths: number;
+  country: string;
+  region: string;
+  device: string;
+  browser: string;
+  firstSeen: string;
+  lastSeen: string;
+}
+
+pageviewRoutes.get('/stats/visitors', requireAdmin, async (c) => {
+  const ip = clientIp(c);
+  if (!statsLimiter.allow(ip)) return c.json({ error: 'Too many requests' }, 429);
+
+  const parsed = visitorsQuerySchema.safeParse({
+    site: c.req.query('site'),
+    day: c.req.query('day'),
+  });
+  if (!parsed.success) {
+    const issue = parsed.error.issues[0];
+    return c.json({ error: `${issue.path.join('.')}: ${issue.message}` }, 400);
+  }
+
+  const { site, day } = parsed.data;
+  if (!allowedSites().includes(site)) return c.json({ error: 'Unknown site' }, 400);
+
+  const { fromTs, toTs } = dayBounds(day);
+  const visitors = (await db.execute(sql`
+    SELECT visitor_hash AS hash,
+           count(*)::int AS views,
+           count(distinct path)::int AS paths,
+           max(coalesce(country, '')) AS country,
+           max(coalesce(region, '')) AS region,
+           max(device_type) AS device,
+           max(ua_family) AS browser,
+           to_char(min(created_at) AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS "firstSeen",
+           to_char(max(created_at) AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS "lastSeen"
+    FROM pageviews
+    WHERE site = ${site} AND created_at >= ${fromTs} AND created_at <= ${toTs}
+    GROUP BY visitor_hash
+    ORDER BY count(*) DESC, min(created_at) ASC
+    LIMIT 500
+  `)) as unknown as VisitorRow[];
+
+  return c.json({ site, day, stale: dayIsStale(day), visitors });
+});
+
+interface VisitorHit {
+  path: string;
+  referrer: string;
+  country: string;
+  region: string;
+  device: string;
+  browser: string;
+  at: string;
+}
+
+pageviewRoutes.get('/stats/visitors/:hash', requireAdmin, async (c) => {
+  const ip = clientIp(c);
+  if (!statsLimiter.allow(ip)) return c.json({ error: 'Too many requests' }, 429);
+
+  const hash = c.req.param('hash');
+  if (!isVisitorHash(hash)) return c.json({ error: 'Not found' }, 404);
+
+  const parsed = visitorsQuerySchema.safeParse({
+    site: c.req.query('site'),
+    day: c.req.query('day'),
+  });
+  if (!parsed.success) {
+    const issue = parsed.error.issues[0];
+    return c.json({ error: `${issue.path.join('.')}: ${issue.message}` }, 400);
+  }
+
+  const { site, day } = parsed.data;
+  if (!allowedSites().includes(site)) return c.json({ error: 'Unknown site' }, 400);
+
+  const { fromTs, toTs } = dayBounds(day);
+  const hits = (await db.execute(sql`
+    SELECT path,
+           referrer,
+           coalesce(country, '') AS country,
+           coalesce(region, '') AS region,
+           device_type AS device,
+           ua_family AS browser,
+           to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS "at"
+    FROM pageviews
+    WHERE site = ${site} AND visitor_hash = ${hash}
+      AND created_at >= ${fromTs} AND created_at <= ${toTs}
+    ORDER BY created_at ASC
+    LIMIT 1000
+  `)) as unknown as VisitorHit[];
+
+  if (hits.length === 0) return c.json({ error: 'Not found' }, 404);
+
+  return c.json({ site, day, hash, hits });
 });

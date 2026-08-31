@@ -46,3 +46,39 @@ export interface PageviewStats {
   groupBy: PageviewGroupBy | null;
   breakdown: PageviewGroupRow[] | null;
 }
+
+export interface Visitor {
+  hash: string;
+  views: number;
+  paths: number;
+  country: string;
+  region: string;
+  device: string;
+  browser: string;
+  firstSeen: string;
+  lastSeen: string;
+}
+
+export interface VisitorsResponse {
+  site: string;
+  day: string;
+  stale: boolean;
+  visitors: Visitor[];
+}
+
+export interface VisitorHit {
+  path: string;
+  referrer: string;
+  country: string;
+  region: string;
+  device: string;
+  browser: string;
+  at: string;
+}
+
+export interface VisitorSession {
+  site: string;
+  day: string;
+  hash: string;
+  hits: VisitorHit[];
+}
